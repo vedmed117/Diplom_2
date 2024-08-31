@@ -6,16 +6,40 @@ import io.restassured.response.Response;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 import org.praktikum.auth.UserRequest;
+
+import java.util.Arrays;
+import java.util.Collection;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.anyOf;
 import static org.hamcrest.Matchers.equalTo;
 
+@RunWith(Parameterized.class)
 public class AuthRegisterTest {
 
     private String accessToken;
     private UserRequest userRequest;
+    private final String email;
+    private final String password;
+    private final String name;
+
+    public AuthRegisterTest(String email, String password, String name) {
+        this.email = email;
+        this.password = password;
+        this.name = name;
+    }
+
+    @Parameterized.Parameters
+    public static Collection<Object[]> testData() {
+        return Arrays.asList(new Object[][]{
+                {null, "password", "UserWithoutEmail"},
+                {"user@example.com", null, "UserWithoutPassword"},
+                {"user@example.com", "password", null}
+        });
+    }
 
     @Before
     public void setUp() {
@@ -68,28 +92,31 @@ public class AuthRegisterTest {
     @Test
     @DisplayName("Create User Already Registered")
     @Description("This test tries to create a user that is already registered and expects an error.")
-    public void createUserAlreadyRegisteredTest() {
+    public void createUserAlreadyRegisteredTest() throws InterruptedException {
+        // Создаем уникальные данные пользователя
         userRequest = new UserRequest(
                 "already-registered-email_" + System.currentTimeMillis() + "@yandex.ru",
                 "password",
                 "ExistingUser_" + System.currentTimeMillis()
         );
 
-        registerUser(userRequest).then().statusCode(200); // First registration should succeed
+        // Регистрируем пользователя впервые
+        Response firstResponse = registerUser(userRequest);
+        firstResponse.then().statusCode(200).body("success", equalTo(true));
 
-        Response response = registerUser(userRequest); // Second registration attempt
-        response.then().statusCode(403).body("message", equalTo("User already exists"));
+        // Извлекаем accessToken
+        accessToken = firstResponse.then().extract().path("accessToken").toString();
+
+        // Пытаемся зарегистрировать того же пользователя снова
+        Response secondResponse = registerUser(userRequest);
+        secondResponse.then().statusCode(403).body("message", equalTo("User already exists"));
     }
 
     @Test
     @DisplayName("Create User with Missing Required Field")
     @Description("This test tries to create a user with a missing required field and expects an error.")
     public void createUserWithMissingFieldTest() {
-        userRequest = new UserRequest(
-                null,  // Missing email
-                "password",
-                "UserWithoutEmail"
-        );
+        userRequest = new UserRequest(email, password, name);
 
         Response response = registerUser(userRequest);
         response.then().statusCode(403).body("message", equalTo("Email, password and name are required fields"));
