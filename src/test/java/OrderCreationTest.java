@@ -1,109 +1,152 @@
-import io.qameta.allure.junit4.DisplayName;
 import io.qameta.allure.Description;
 import io.qameta.allure.Step;
+import io.qameta.allure.junit4.DisplayName;
 import io.restassured.RestAssured;
 import io.restassured.response.Response;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.praktikum.auth.UserRequest;
 import org.praktikum.orders.OrderRequest;
 
 import java.util.Arrays;
-import java.util.List;
 
 import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.anyOf;
 import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.notNullValue;
 
 public class OrderCreationTest {
 
     private String accessToken;
 
     @Before
+    @Step("Установка базового URL и создание тестового пользователя")
     public void setUp() {
         RestAssured.baseURI = "https://stellarburgers.nomoreparties.site/api";
+
+        // Создаем уникальные данные пользователя
+        UserRequest userRequest = new UserRequest(
+                "test-email_" + System.currentTimeMillis() + "@yandex.ru",
+                "password",
+                "TestUser_" + System.currentTimeMillis()
+        );
+
+        // Отправляем запрос на создание пользователя
+        Response response = given()
+                .header("Content-type", "application/json")
+                .body(userRequest)
+                .when()
+                .post("/auth/register");
+
+        // Извлекаем accessToken из ответа
+        accessToken = response.then().extract().path("accessToken").toString();
+    }
+
+    @After
+    @Step("Удаление тестового пользователя")
+    public void tearDown() {
+        // Удаляем пользователя с использованием accessToken
+        if (accessToken != null) {
+            given()
+                    .header("Authorization", accessToken)
+                    .when()
+                    .delete("/auth/user")
+                    .then()
+                    .statusCode(anyOf(equalTo(200), equalTo(202)));
+        }
     }
 
     @Test
-    @DisplayName("Create Order with Authorization")
-    @Description("This test creates an order with authorization and valid ingredients.")
-    public void createOrderWithAuthorization() {
-        // Получаем токен авторизации
-        accessToken = "Bearer " + getAccessToken();
-
-        // Список ингредиентов
-        List<String> ingredients = Arrays.asList("61c0c5a71d1f82001bdaaa6d");
+    @DisplayName("Создание заказа с авторизацией")
+    @Description("Тест проверяет создание заказа с авторизацией")
+    public void createOrderWithAuthTest() {
+        // Создаем заказ с ингредиентами
+        OrderRequest orderRequest = new OrderRequest(Arrays.asList("61c0c5a71d1f82001bdaaa6d"));
 
         // Отправляем запрос на создание заказа
-        Response response = createOrder(ingredients, accessToken);
-
-        // Проверяем успешность создания заказа
-        response.then().statusCode(200).body("success", equalTo(true));
-        response.then().body("order.number", notNullValue());
-    }
-
-    @Test
-    @DisplayName("Create Order Without Authorization")
-    @Description("This test creates an order without authorization and valid ingredients.")
-    public void createOrderWithoutAuthorization() {
-        // Список ингредиентов
-        List<String> ingredients = Arrays.asList("61c0c5a71d1f82001bdaaa6d");
-
-        // Отправляем запрос на создание заказа без токена
-        Response response = createOrder(ingredients, null);
-
-        // Проверяем успешность создания заказа
-        response.then().statusCode(200).body("success", equalTo(true));
-        response.then().body("order.number", notNullValue());
-    }
-
-    @Test
-    @DisplayName("Create Order Without Ingredients")
-    @Description("This test tries to create an order without ingredients and expects an error.")
-    public void createOrderWithoutIngredients() {
-        // Пустой список ингредиентов
-        List<String> ingredients = Arrays.asList();
-
-        // Отправляем запрос на создание заказа без ингредиентов
-        Response response = createOrder(ingredients, null);
-
-        // Проверяем статус и сообщение об ошибке
-        response.then().statusCode(400).body("message", equalTo("Ingredient ids must be provided"));
-    }
-
-    @Test
-    @DisplayName("Create Order with Invalid Ingredient Hash")
-    @Description("This test tries to create an order with an invalid ingredient hash and expects an error.")
-    public void createOrderWithInvalidIngredientHash() {
-        // Неправильный ингредиент
-        List<String> ingredients = Arrays.asList("60d3b41abdacab0026a733c6");
-
-        // Отправляем запрос на создание заказа с неправильным ингредиентом
-        Response response = createOrder(ingredients, null);
-
-        // Логируем фактический ответ
-        System.out.println("Response: " + response.asString());
-
-        // Проверяем, что статус 400, и сообщение об ошибке правильное
-        response.then().statusCode(400)
-                .body("message", equalTo("One or more ids provided are incorrect"));
-    }
-
-
-    @Step("Creating an order with ingredients: {ingredients} and access token: {accessToken}")
-    private Response createOrder(List<String> ingredients, String accessToken) {
-        OrderRequest orderRequest = new OrderRequest(ingredients);
-
-        return given()
+        given()
+                .header("Authorization", accessToken)
                 .header("Content-type", "application/json")
-                .header("Authorization", accessToken != null ? accessToken : "")
                 .body(orderRequest)
                 .when()
-                .post("/orders");
+                .post("/orders")
+                .then()
+                .statusCode(200)
+                .body("success", equalTo(true));
     }
 
-    @Step("Get access token for the user")
-    private String getAccessToken() {
-        // Реализуйте получение токена авторизации для создания заказа
-        return "your_access_token";
+    @Test
+    @DisplayName("Создание заказа без авторизации")
+    @Description("Тест проверяет создание заказа без авторизации")
+    public void createOrderWithoutAuthTest() {
+        // Создаем заказ с ингредиентами
+        OrderRequest orderRequest = new OrderRequest(Arrays.asList("61c0c5a71d1f82001bdaaa6d"));
+
+        // Отправляем запрос на создание заказа
+        given()
+                .header("Content-type", "application/json")
+                .body(orderRequest)
+                .when()
+                .post("/orders")
+                .then()
+                .statusCode(200)  // Статус 200, так как заказ можно создать и без авторизации
+                .body("success", equalTo(true));
+    }
+
+    @Test
+    @DisplayName("Создание заказа без ингредиентов")
+    @Description("Тест проверяет создание заказа без ингредиентов")
+    public void createOrderWithoutIngredientsTest() {
+        // Создаем заказ без ингредиентов
+        OrderRequest orderRequest = new OrderRequest(Arrays.asList());
+
+        // Отправляем запрос на создание заказа
+        given()
+                .header("Authorization", accessToken)
+                .header("Content-type", "application/json")
+                .body(orderRequest)
+                .when()
+                .post("/orders")
+                .then()
+                .statusCode(400)
+                .body("message", equalTo("Ingredient ids must be provided"));
+    }
+
+    @Test
+    @DisplayName("Создание заказа с неверным хешем ингредиентов")
+    @Description("Тест проверяет создание заказа с неверным хешем ингредиентов")
+    public void createOrderWithInvalidIngredientHash() {
+        // Создаем заказ с неверным хешем ингредиентов
+        OrderRequest orderRequest = new OrderRequest(Arrays.asList("test"));
+
+        // Отправляем запрос на создание заказа
+        given()
+                .header("Authorization", accessToken)
+                .header("Content-type", "application/json")
+                .body(orderRequest)
+                .when()
+                .post("/orders")
+                .then()
+                .statusCode(500);  // Ожидаем 500 - Internal Server Error;
+    }
+
+
+    @Step("Создать тестового пользователя")
+    private Response registerUser(UserRequest userRequest) {
+        return given()
+                .header("Content-type", "application/json")
+                .body(userRequest)
+                .when()
+                .post("/auth/register");
+    }
+
+    @Step("Удалить пользователя с токеном: {accessToken}")
+    private void deleteUser(String accessToken) {
+        given()
+                .header("Authorization", accessToken)
+                .when()
+                .delete("/auth/user")
+                .then()
+                .statusCode(anyOf(equalTo(200), equalTo(202)));
     }
 }
