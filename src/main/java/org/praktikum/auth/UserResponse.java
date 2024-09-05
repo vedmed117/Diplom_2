@@ -6,7 +6,6 @@ public class UserResponse {
     private String accessToken;
     private String refreshToken;
 
-    // Геттеры и сеттеры
     public boolean isSuccess() {
         return success;
     }

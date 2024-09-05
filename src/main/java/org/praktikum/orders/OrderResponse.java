@@ -5,7 +5,6 @@ public class OrderResponse {
     private String name;
     private String orderId;
 
-    // Getters and Setters
     public boolean isSuccess() {
         return success;
     }

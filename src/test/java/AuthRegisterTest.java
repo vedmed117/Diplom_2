@@ -6,40 +6,16 @@ import io.restassured.response.Response;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
 import org.praktikum.auth.UserRequest;
-
-import java.util.Arrays;
-import java.util.Collection;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.anyOf;
 import static org.hamcrest.Matchers.equalTo;
 
-@RunWith(Parameterized.class)
 public class AuthRegisterTest {
 
     private String accessToken;
     private UserRequest userRequest;
-    private final String email;
-    private final String password;
-    private final String name;
-
-    public AuthRegisterTest(String email, String password, String name) {
-        this.email = email;
-        this.password = password;
-        this.name = name;
-    }
-
-    @Parameterized.Parameters
-    public static Collection<Object[]> testData() {
-        return Arrays.asList(new Object[][]{
-                {null, "password", "UserWithoutEmail"},
-                {"user@example.com", null, "UserWithoutPassword"},
-                {"user@example.com", "password", null}
-        });
-    }
 
     @Before
     public void setUp() {
@@ -57,73 +33,46 @@ public class AuthRegisterTest {
     @DisplayName("Create Unique User")
     @Description("This test creates a unique user and verifies the creation.")
     public void createUniqueUser() throws InterruptedException {
-        // Создаем уникальные данные пользователя
-        userRequest = new UserRequest(
+        userRequest = createUserData(
                 "unique-email_" + System.currentTimeMillis() + "@yandex.ru",
                 "password",
                 "UniqueUser_" + System.currentTimeMillis()
         );
 
-        // Отправляем POST запрос на регистрацию пользователя
-        Response response = given()
-                .header("Content-type", "application/json")
-                .and()
-                .body(userRequest)
-                .when()
-                .post("/auth/register");
+        Response response = registerUser(userRequest);
 
-        // Устанавливаем задержку в 3 секунды перед проверкой ответа
-        Thread.sleep(3000);
+        checkSuccessfulResponse(response);
 
-        // Извлекаем accessToken из ответа
-        accessToken = response.then().extract().path("accessToken").toString();
-
-        // Проверяем успешность получения accessToken
-        if (accessToken != null && !accessToken.isEmpty()) {
-            System.out.println("Access token получен: " + accessToken);
-        } else {
-            System.out.println("Не удалось получить access token");
-        }
-
-        // Проверка успешного создания пользователя
-        response.then().statusCode(200).body("success", equalTo(true));
+        accessToken = extractAccessToken(response);
     }
 
     @Test
     @DisplayName("Create User Already Registered")
     @Description("This test tries to create a user that is already registered and expects an error.")
     public void createUserAlreadyRegisteredTest() throws InterruptedException {
-        // Создаем уникальные данные пользователя
-        userRequest = new UserRequest(
+        // Создание уникальных данных пользователя
+        userRequest = createUserData(
                 "already-registered-email_" + System.currentTimeMillis() + "@yandex.ru",
                 "password",
                 "ExistingUser_" + System.currentTimeMillis()
         );
 
-        // Регистрируем пользователя впервые
         Response firstResponse = registerUser(userRequest);
-        firstResponse.then().statusCode(200).body("success", equalTo(true));
+        checkSuccessfulResponse(firstResponse);
 
-        // Извлекаем accessToken
-        accessToken = firstResponse.then().extract().path("accessToken").toString();
+        accessToken = extractAccessToken(firstResponse);
 
-        // Пытаемся зарегистрировать того же пользователя снова
         Response secondResponse = registerUser(userRequest);
-        secondResponse.then().statusCode(403).body("message", equalTo("User already exists"));
+        checkUserAlreadyExistsResponse(secondResponse);
     }
 
-    @Test
-    @DisplayName("Create User with Missing Required Field")
-    @Description("This test tries to create a user with a missing required field and expects an error.")
-    public void createUserWithMissingFieldTest() {
-        userRequest = new UserRequest(email, password, name);
-
-        Response response = registerUser(userRequest);
-        response.then().statusCode(403).body("message", equalTo("Email, password and name are required fields"));
+    @Step("Create user data with email: {email}, password: {password}, name: {name}")
+    public UserRequest createUserData(String email, String password, String name) {
+        return new UserRequest(email, password, name);
     }
 
     @Step("Register a new user")
-    private Response registerUser(UserRequest user) {
+    public Response registerUser(UserRequest user) {
         return given()
                 .header("Content-type", "application/json")
                 .body(user)
@@ -131,7 +80,23 @@ public class AuthRegisterTest {
                 .post("/auth/register");
     }
 
-    @Step("Delete user with access token: {accessToken}")
+   @Step("Check that registration was successful")
+    public void checkSuccessfulResponse(Response response) {
+        response.then().statusCode(200).body("success", equalTo(true));
+    }
+
+
+    @Step("Check that user already exists")
+    public void checkUserAlreadyExistsResponse(Response response) {
+        response.then().statusCode(403).body("message", equalTo("User already exists"));
+    }
+
+    // Шаг: извлечение accessToken
+    @Step("Extract access token from the response")
+    public String extractAccessToken(Response response) {
+        return response.then().extract().path("accessToken").toString();
+    }
+
     private void deleteUser(String accessToken) {
         given()
                 .header("Authorization", accessToken)

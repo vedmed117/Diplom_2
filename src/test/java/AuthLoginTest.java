@@ -17,23 +17,18 @@ public class AuthLoginTest {
     private UserRequest userRequest;
 
     @Before
-    @Step("Setup: Register a new user for testing login")
     public void setUp() {
         RestAssured.baseURI = "https://stellarburgers.nomoreparties.site/api";
-        // Создаем тестового пользователя
-        userRequest = new UserRequest(
+        userRequest = createUserData(
                 "login-test-email_" + System.currentTimeMillis() + "@yandex.ru",
                 "password",
                 "LoginTestUser"
         );
-
-        // Регистрируем пользователя для тестов логина
         Response response = registerUser(userRequest);
-        accessToken = response.then().extract().path("accessToken").toString();
+        accessToken = extractAccessToken(response);
     }
 
     @After
-    @Step("Tear down: Delete the test user")
     public void tearDown() {
         if (accessToken != null) {
             deleteUser(accessToken);
@@ -41,25 +36,29 @@ public class AuthLoginTest {
     }
 
     @Test
-    @DisplayName("Login with Existing User")
-    @Description("This test verifies that a user can log in with correct credentials.")
-    @Step("Test: Login with existing user credentials")
-    public void loginWithExistingUser() {
-        Response response = loginUser(userRequest.getEmail(), userRequest.getPassword());
-        response.then().statusCode(200).body("success", equalTo(true));
+    @DisplayName("Login with valid credentials")
+    @Description("This test checks that a user can log in with valid credentials.")
+    public void loginWithValidCredentials() {
+        Response response = loginUser(userRequest);
+        checkLoginSuccess(response);
     }
 
     @Test
-    @DisplayName("Login with Invalid Credentials")
-    @Description("This test verifies that login fails with incorrect credentials.")
-    @Step("Test: Attempt to login with invalid credentials")
+    @DisplayName("Login with invalid credentials")
+    @Description("This test checks that a user cannot log in with invalid credentials.")
     public void loginWithInvalidCredentials() {
-        Response response = loginUser("wrong-email@yandex.ru", "wrongpassword");
-        response.then().statusCode(401).body("message", equalTo("email or password are incorrect"));
+        UserRequest invalidUserRequest = createUserData("invalid-email@yandex.ru", "wrongPassword", "WrongUser");
+        Response response = loginUser(invalidUserRequest);
+        checkLoginFailure(response);
+    }
+
+    @Step("Create user data with email: {email}, password: {password}, name: {name}")
+    public UserRequest createUserData(String email, String password, String name) {
+        return new UserRequest(email, password, name);
     }
 
     @Step("Register a new user")
-    private Response registerUser(UserRequest user) {
+    public Response registerUser(UserRequest user) {
         return given()
                 .header("Content-type", "application/json")
                 .body(user)
@@ -67,16 +66,30 @@ public class AuthLoginTest {
                 .post("/auth/register");
     }
 
-    @Step("Login user with email: {email} and password: {password}")
-    private Response loginUser(String email, String password) {
+    @Step("Log in user")
+    public Response loginUser(UserRequest user) {
         return given()
                 .header("Content-type", "application/json")
-                .body("{\"email\":\"" + email + "\", \"password\":\"" + password + "\"}")
+                .body(user)
                 .when()
                 .post("/auth/login");
     }
 
-    @Step("Delete user with access token: {accessToken}")
+    @Step("Check login success")
+    public void checkLoginSuccess(Response response) {
+        response.then().statusCode(200).body("success", equalTo(true));
+    }
+
+    @Step("Check login failure")
+    public void checkLoginFailure(Response response) {
+        response.then().statusCode(401).body("message", equalTo("email or password are incorrect"));
+    }
+
+    @Step("Extract access token from the response")
+    public String extractAccessToken(Response response) {
+        return response.then().extract().path("accessToken").toString();
+    }
+
     private void deleteUser(String accessToken) {
         given()
                 .header("Authorization", accessToken)

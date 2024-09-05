@@ -17,23 +17,18 @@ public class AuthUserUpdateTest {
     private UserRequest userRequest;
 
     @Before
-    @Step("Setup: Register a new user for testing update operations")
     public void setUp() {
         RestAssured.baseURI = "https://stellarburgers.nomoreparties.site/api";
-        // Создаем тестового пользователя
-        userRequest = new UserRequest(
+        userRequest = createUserData(
                 "update-test-email_" + System.currentTimeMillis() + "@yandex.ru",
                 "password",
                 "UpdateTestUser"
         );
-
-        // Регистрируем пользователя для тестов обновления данных
         Response response = registerUser(userRequest);
-        accessToken = response.then().extract().path("accessToken").toString();
+        accessToken = extractAccessToken(response);
     }
 
     @After
-    @Step("Teardown: Delete the test user")
     public void tearDown() {
         if (accessToken != null) {
             deleteUser(accessToken);
@@ -43,43 +38,36 @@ public class AuthUserUpdateTest {
     @Test
     @DisplayName("Update User Data with Authorization")
     @Description("This test verifies that a user can update their data when authenticated.")
-    @Step("Test: Update user data with valid authorization")
     public void updateUserWithAuthorization() {
-        // Создаем новый запрос с измененными данными
-        UserRequest updatedRequest = new UserRequest(
+        UserRequest updatedRequest = createUserData(
                 "updated-email_" + System.currentTimeMillis() + "@yandex.ru",
                 "newpassword",
                 "UpdatedUserName"
         );
-
-        // Отправляем PATCH запрос на обновление данных пользователя
         Response response = updateUser(updatedRequest, accessToken);
-        response.then().statusCode(200).body("success", equalTo(true));
-
-        // Проверяем, что данные пользователя обновлены
-        response.then().body("user.email", equalTo(updatedRequest.getEmail()))
-                .body("user.name", equalTo(updatedRequest.getName()));
+        checkSuccessfulUpdate(response, updatedRequest);
     }
 
     @Test
     @DisplayName("Update User Data without Authorization")
     @Description("This test verifies that attempting to update user data without authorization results in an error.")
-    @Step("Test: Update user data without authorization")
     public void updateUserWithoutAuthorization() {
-        // Создаем новый запрос с измененными данными
-        UserRequest updatedRequest = new UserRequest(
+        UserRequest updatedRequest = createUserData(
                 "no-auth-email_" + System.currentTimeMillis() + "@yandex.ru",
                 "newpassword",
                 "NoAuthUserName"
         );
-
-        // Пытаемся обновить данные пользователя без авторизации
         Response response = updateUser(updatedRequest, null);
-        response.then().statusCode(401).body("message", equalTo("You should be authorised"));
+        checkUnauthorizedUpdate(response);
+    }
+
+    @Step("Create user data with email: {email}, password: {password}, name: {name}")
+    public UserRequest createUserData(String email, String password, String name) {
+        return new UserRequest(email, password, name);
     }
 
     @Step("Register a new user")
-    private Response registerUser(UserRequest user) {
+    public Response registerUser(UserRequest user) {
         return given()
                 .header("Content-type", "application/json")
                 .body(user)
@@ -88,7 +76,7 @@ public class AuthUserUpdateTest {
     }
 
     @Step("Update user data with access token: {accessToken}")
-    private Response updateUser(UserRequest user, String accessToken) {
+    public Response updateUser(UserRequest user, String accessToken) {
         return given()
                 .header("Content-type", "application/json")
                 .header("Authorization", accessToken != null ? accessToken : "")
@@ -97,7 +85,23 @@ public class AuthUserUpdateTest {
                 .patch("/auth/user");
     }
 
-    @Step("Delete user with access token: {accessToken}")
+    @Step("Check successful update of user data")
+    public void checkSuccessfulUpdate(Response response, UserRequest updatedRequest) {
+        response.then().statusCode(200).body("success", equalTo(true));
+        response.then().body("user.email", equalTo(updatedRequest.getEmail()))
+                .body("user.name", equalTo(updatedRequest.getName()));
+    }
+
+    @Step("Check unauthorized update of user data")
+    public void checkUnauthorizedUpdate(Response response) {
+        response.then().statusCode(401).body("message", equalTo("You should be authorised"));
+    }
+
+    @Step("Extract access token from the response")
+    public String extractAccessToken(Response response) {
+        return response.then().extract().path("accessToken").toString();
+    }
+
     private void deleteUser(String accessToken) {
         given()
                 .header("Authorization", accessToken)
