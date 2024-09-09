@@ -1,16 +1,13 @@
 import io.qameta.allure.junit4.DisplayName;
 import io.qameta.allure.Description;
-import io.qameta.allure.Step;
 import io.restassured.RestAssured;
 import io.restassured.response.Response;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.praktikum.auth.UserRequest;
-
-import static io.restassured.RestAssured.given;
-import static org.hamcrest.Matchers.anyOf;
-import static org.hamcrest.Matchers.equalTo;
+import org.praktikum.utils.ApiSteps;
+import org.praktikum.utils.BASE_URI;
 
 public class AuthRegisterTest {
 
@@ -19,90 +16,49 @@ public class AuthRegisterTest {
 
     @Before
     public void setUp() {
-        RestAssured.baseURI = "https://stellarburgers.nomoreparties.site/api";
+        RestAssured.baseURI = BASE_URI.getBaseURI();
     }
 
     @After
     public void tearDown() {
         if (accessToken != null) {
-            deleteUser(accessToken);
+            ApiSteps.deleteUser(accessToken);
         }
     }
 
     @Test
-    @DisplayName("Create Unique User")
-    @Description("This test creates a unique user and verifies the creation.")
+    @DisplayName("Создание уникального пользователя")
+    @Description("Этот тест создает уникального пользователя и проверяет успешность создания")
     public void createUniqueUser() throws InterruptedException {
-        userRequest = createUserData(
+        userRequest = ApiSteps.createUserData(
                 "unique-email_" + System.currentTimeMillis() + "@yandex.ru",
                 "password",
                 "UniqueUser_" + System.currentTimeMillis()
         );
 
-        Response response = registerUser(userRequest);
+        Response response = ApiSteps.registerUser(userRequest);
 
-        checkSuccessfulResponse(response);
+        ApiSteps.checkSuccessfulResponse(response);
 
-        accessToken = extractAccessToken(response);
+        accessToken = ApiSteps.extractAccessToken(response);
     }
 
     @Test
-    @DisplayName("Create User Already Registered")
-    @Description("This test tries to create a user that is already registered and expects an error.")
+    @DisplayName("Создание уже зарегистрированного пользователя")
+    @Description("Этот тест пытается создать уже зарегистрированного пользователя и ожидает ошибку")
     public void createUserAlreadyRegisteredTest() throws InterruptedException {
-        // Создание уникальных данных пользователя
-        userRequest = createUserData(
+        userRequest = ApiSteps.createUserData(
                 "already-registered-email_" + System.currentTimeMillis() + "@yandex.ru",
                 "password",
                 "ExistingUser_" + System.currentTimeMillis()
         );
 
-        Response firstResponse = registerUser(userRequest);
-        checkSuccessfulResponse(firstResponse);
+        Response firstResponse = ApiSteps.registerUser(userRequest);
+        ApiSteps.checkSuccessfulResponse(firstResponse);
 
-        accessToken = extractAccessToken(firstResponse);
+        accessToken = ApiSteps.extractAccessToken(firstResponse);
 
-        Response secondResponse = registerUser(userRequest);
-        checkUserAlreadyExistsResponse(secondResponse);
-    }
-
-    @Step("Create user data with email: {email}, password: {password}, name: {name}")
-    public UserRequest createUserData(String email, String password, String name) {
-        return new UserRequest(email, password, name);
-    }
-
-    @Step("Register a new user")
-    public Response registerUser(UserRequest user) {
-        return given()
-                .header("Content-type", "application/json")
-                .body(user)
-                .when()
-                .post("/auth/register");
-    }
-
-   @Step("Check that registration was successful")
-    public void checkSuccessfulResponse(Response response) {
-        response.then().statusCode(200).body("success", equalTo(true));
-    }
-
-
-    @Step("Check that user already exists")
-    public void checkUserAlreadyExistsResponse(Response response) {
-        response.then().statusCode(403).body("message", equalTo("User already exists"));
-    }
-
-    // Шаг: извлечение accessToken
-    @Step("Extract access token from the response")
-    public String extractAccessToken(Response response) {
-        return response.then().extract().path("accessToken").toString();
-    }
-
-    private void deleteUser(String accessToken) {
-        given()
-                .header("Authorization", accessToken)
-                .when()
-                .delete("/auth/user")
-                .then()
-                .statusCode(anyOf(equalTo(200), equalTo(202)));
+        Response secondResponse = ApiSteps.registerUser(userRequest);
+        ApiSteps.checkUserAlreadyExistsResponse(secondResponse);
     }
 }
