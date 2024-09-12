@@ -8,6 +8,7 @@ import org.junit.Test;
 import org.praktikum.auth.UserRequest;
 import org.praktikum.utils.ApiSteps;
 import org.praktikum.utils.BASE_URI;
+import org.praktikum.utils.RestAssuredConfig;
 
 public class AuthUserUpdateTest {
 
@@ -16,7 +17,7 @@ public class AuthUserUpdateTest {
 
     @Before
     public void setUp() {
-        RestAssured.baseURI = BASE_URI.getBaseURI();
+        RestAssuredConfig.init();
         userRequest = ApiSteps.createUserData(
                 "update-test-email_" + System.currentTimeMillis() + "@yandex.ru",
                 "password",

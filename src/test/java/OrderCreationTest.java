@@ -9,6 +9,7 @@ import org.praktikum.auth.UserRequest;
 import org.praktikum.orders.OrderRequest;
 import org.praktikum.utils.ApiSteps;
 import org.praktikum.utils.BASE_URI;
+import org.praktikum.utils.RestAssuredConfig;
 
 public class OrderCreationTest {
 
@@ -16,7 +17,7 @@ public class OrderCreationTest {
 
     @Before
     public void setUp() {
-        RestAssured.baseURI = BASE_URI.getBaseURI();
+        RestAssuredConfig.init();
         UserRequest userRequest = ApiSteps.createUserData(
                 "test-email_" + System.currentTimeMillis() + "@yandex.ru",
                 "password",

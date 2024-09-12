@@ -8,6 +8,7 @@ import org.praktikum.orders.OrderRequest;
 import java.util.List;
 
 import static io.restassured.RestAssured.given;
+import static org.hamcrest.CoreMatchers.hasItem;
 import static org.hamcrest.Matchers.equalTo;
 
 public class ApiSteps {
@@ -125,5 +126,34 @@ public class ApiSteps {
                 .delete(API_URI.getUserUri())
                 .then()
                 .statusCode(equalTo(202));
+    }
+    @Step("Получение заказов с access token: {accessToken}")
+    public static Response getOrders(String accessToken) {
+        return given()
+                .header("Authorization", accessToken != null ? accessToken : "")
+                .when()
+                .get(API_URI.getOrdersUri());
+    }
+
+    @Step("Проверка успешного получения заказов")
+    public static void checkOrderRetrievalSuccess(Response response) {
+        response.then().statusCode(200).body("success", equalTo(true));
+    }
+
+    @Step("Проверка ошибки доступа без авторизации")
+    public static void checkUnauthorizedAccess(Response response) {
+        response.then().statusCode(401).body("message", equalTo("You should be authorised"));
+    }
+
+    @Step("Извлечение ID созданного заказа")
+    public static String extractOrderId(Response response) {
+        return response.then().extract().path("order.number").toString();
+    }
+
+    @Step("Проверка успешного получения заказов с созданным заказом")
+    public static void checkOrderRetrievalSuccess(Response response, String createdOrderId) {
+        response.then().statusCode(200)
+                .body("success", equalTo(true))
+                .body("orders.number", hasItem(Integer.parseInt(createdOrderId)));
     }
 }

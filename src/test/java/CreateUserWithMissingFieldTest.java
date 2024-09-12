@@ -9,6 +9,7 @@ import org.junit.runners.Parameterized;
 import org.praktikum.auth.UserRequest;
 import org.praktikum.utils.ApiSteps;
 import org.praktikum.utils.BASE_URI;
+import org.praktikum.utils.RestAssuredConfig;
 
 import java.util.Arrays;
 import java.util.Collection;
@@ -37,7 +38,7 @@ public class CreateUserWithMissingFieldTest {
 
     @Before
     public void setUp() {
-        RestAssured.baseURI = BASE_URI.getBaseURI();
+        RestAssuredConfig.init();
     }
 
     @Test
